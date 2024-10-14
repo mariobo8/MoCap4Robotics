@@ -3,6 +3,11 @@ from flask_socketio import SocketIO
 from camera_manager import CameraManager
 import time
 
+# TODO: Add a button to play and pause camera streaming
+# TODO: Add button to start lights localization
+# TODO: Add div where to put 3d space of where can se the cameras initially then also th dots
+  
+
 app = Flask(__name__)
 socketio = SocketIO(app)
 
