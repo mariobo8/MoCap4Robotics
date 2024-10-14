@@ -97,6 +97,64 @@
             border-radius: 5px;
             max-width: 400px;
         }
+        .stream-control {
+            margin-top: 10px;
+        }
+        #toggleStreamBtn {
+            background-color: #4CAF50;
+            margin-left: 10px;
+        }
+        #toggleStreamBtn.streaming {
+            background-color: #f44336;
+        }
+        #toggleDotDetectionBtn {
+            background-color: #4CAF50;
+            margin-left: 10px;
+        }
+        #toggleDotDetectionBtn.detection {
+            background-color: #f44336;
+        }
+        .camera-feed {
+            margin: 0 10px;
+            text-align: center;
+        }
+        .camera-placeholder {
+            width: 460px;  /* Set to match camera resolution width */
+            height: 480px; /* Set to match camera resolution height */
+            background-color: #888;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-size: 18px;
+            text-align: center;
+        }
+        .camera-feed img {
+            width: 640px;
+            height: 480px; 
+            object-fit: cover;
+            display: none; 
+        }
+        .camera-streams, .visualization-3d {
+            background-color: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 95%;
+            max-width: 1920px;
+            margin-bottom: 20px;
+        }
+
+        .visualization-content {
+            width: 100%;
+            height: 400px; 
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 18px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -109,6 +167,7 @@
                 <p>{{ error_message }}</p>
             </div>
         {% endif %}
+
         <div class="camera-streams">
             <div class="streams-header">
                 <h2>Camera Streams</h2>
@@ -122,27 +181,82 @@
                         <input type="range" id="gain" min="0" max="63" value="10">
                     </div>
                     <button onclick="updateSettings()">Update</button>
+                    <button id="toggleStreamBtn" onclick="toggleStream()">Start Streaming</button>
+                    <button id="toggleDotDetectionBtn" onclick="toggleDotDetection()">Start Detection</button>
                 </div>
             </div>
             <div class="camera-container">
                 {% for i in range(num_cameras) %}
                 <div class="camera-feed">
                     <h3>Camera {{ i + 1 }}</h3>
-                    <img src="{{ url_for('video_feed', camera_id=i) }}" alt="Camera {{ i + 1 }}">
+                    <div id="placeholder{{ i }}" class="camera-placeholder">
+                        Start streaming to view cameras
+                    </div>
+                    <img id="camera{{ i }}" src="" alt="Camera {{ i + 1 }}">
                 </div>
                 {% endfor %}
             </div>
         </div>
+
+        <div class="visualization-3d">
+            <div class="streams-header">
+                <h2>3D Visualization</h2>
+            </div>
+            <div class="visualization-content">
+                3D visualization content will be added here
+            </div>
+        </div>
+    
     </main>
 
     <script>
         const socket = io();
+        let isStreaming = false;
         
         function updateSettings() {
             const exposure = document.getElementById('exposure').value;
             const gain = document.getElementById('gain').value;
             socket.emit('update_camera_settings', {exposure: parseInt(exposure), gain: parseInt(gain)});
         }
+
+        function toggleStream() {
+            const action = isStreaming ? 'stop' : 'start';
+            socket.emit('toggle_camera_stream', {action: action});
+        }
+
+        function updateCameraStreams(streaming) {
+            const cameras = document.querySelectorAll('.camera-feed img');
+            const placeholders = document.querySelectorAll('.camera-placeholder');
+            cameras.forEach((camera, index) => {
+                if (streaming) {
+                    camera.src = `{{ url_for('video_feed', camera_id=0) }}`.replace('0', index) + '?t=' + new Date().getTime();
+                    camera.style.display = 'block';
+                    placeholders[index].style.display = 'none';
+                } else {
+                    camera.src = '';
+                    camera.style.display = 'none';
+                    placeholders[index].style.display = 'flex';
+                }
+            });
+        }
+
+        let isDotDetectionEnabled = false;
+
+        function toggleDotDetection() {
+            isDotDetectionEnabled = !isDotDetectionEnabled;
+            socket.emit('toggle_dot_detection', {enable: isDotDetectionEnabled});
+        }
+
+        socket.on('dot_detection_toggle_response', function(data) {
+            if (data.success) {
+                const btn = document.getElementById('toggleDotDetectionBtn');
+                btn.textContent = data.enabled ? 'Stop Detection' : 'Start Detection';
+                btn.classList.toggle('detection', data.enabled);
+            } else {
+                console.error('Failed to toggle dot detection');
+                alert('Failed to toggle dot detection');
+            }
+        });
 
         socket.on('settings_updated', function(data) {
             console.log('Camera settings updated:', data);
@@ -152,7 +266,19 @@
             console.error('Failed to update camera settings:', data.message);
             alert('Failed to update camera settings: ' + data.message);
         });
-        
+
+        socket.on('stream_toggle_response', function(data) {
+            if (data.success) {
+                isStreaming = data.action === 'start';
+                const btn = document.getElementById('toggleStreamBtn');
+                btn.textContent = isStreaming ? 'Stop Streaming' : 'Start Streaming';
+                btn.classList.toggle('streaming', isStreaming);
+                updateCameraStreams(isStreaming);
+            } else {
+                console.error('Failed to toggle stream:', data.action);
+                alert(`Failed to ${data.action} stream`);
+            }
+        });
     </script>
 </body>
 </html>
