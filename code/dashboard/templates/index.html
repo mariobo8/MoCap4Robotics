@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MoCap4Robotics</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+        header {
+            background-color: #333;
+            color: white;
+            padding: 1rem;
+            text-align: center;
+        }
+        h1, h2, h3 {
+            margin: 0;
+        }
+        main {
+            flex-grow: 1;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .camera-streams {
+            background-color: #fff;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            width: 95%;
+            max-width: 1920px;
+        }
+        .streams-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+        }
+        .camera-container {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+        }
+        .camera-feed {
+            margin: 0 10px;
+            text-align: center;
+        }
+        .camera-feed img {
+            max-width: 100%;
+            height: auto;
+        }
+        label {
+            margin-right: 5px;
+            color: #555;
+        }
+        input[type="range"] {
+            width: 100px;
+        }
+        button {
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 14px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+        .error-message {
+            background-color: #ffcccc;
+            border: 1px solid #ff0000;
+            color: #ff0000;
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 5px;
+            max-width: 400px;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>MoCap4Robotics</h1>
+    </header>
+    <main>
+        {% if error_message %}
+            <div class="error-message">
+                <p>{{ error_message }}</p>
+            </div>
+        {% endif %}
+        <div class="camera-streams">
+            <div class="streams-header">
+                <h2>Camera Streams</h2>
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="exposure">Exposure:</label>
+                        <input type="range" id="exposure" min="0" max="255" value="100">
+                    </div>
+                    <div class="control-group">
+                        <label for="gain">Gain:</label>
+                        <input type="range" id="gain" min="0" max="63" value="10">
+                    </div>
+                    <button onclick="updateSettings()">Update</button>
+                </div>
+            </div>
+            <div class="camera-container">
+                {% for i in range(num_cameras) %}
+                <div class="camera-feed">
+                    <h3>Camera {{ i + 1 }}</h3>
+                    <img src="{{ url_for('video_feed', camera_id=i) }}" alt="Camera {{ i + 1 }}">
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const socket = io();
+        
+        function updateSettings() {
+            const exposure = document.getElementById('exposure').value;
+            const gain = document.getElementById('gain').value;
+            socket.emit('update_camera_settings', {exposure: parseInt(exposure), gain: parseInt(gain)});
+        }
+
+        socket.on('settings_updated', function(data) {
+            console.log('Camera settings updated:', data);
+        });
+
+        socket.on('settings_update_failed', function(data) {
+            console.error('Failed to update camera settings:', data.message);
+            alert('Failed to update camera settings: ' + data.message);
+        });
+    </script>
+</body>
+</html>
