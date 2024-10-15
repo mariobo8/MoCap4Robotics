@@ -5,15 +5,89 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Three.js Scene with Camera Representations</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <style>
-        body { margin: 0; }
+        body { 
+            margin: 0; 
+            font-family: 'Arial', sans-serif;
+            overflow: hidden;
+        }
         canvas { display: block; }
-        #info { position: absolute; top: 10px; width: 100%; text-align: center; color: white; }
+        #info { 
+            position: absolute; 
+            top: 10px; 
+            width: 100%; 
+            text-align: center; 
+            color: white; 
+            z-index: 100;
+        }
+        #camera-info {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            padding: 15px;
+            color: white;
+            font-size: 14px;
+            line-height: 1.4;
+            max-width: 300px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+        #camera-info:hover {
+            background-color: rgba(0, 0, 0, 0.8);
+        }
+        .camera-position {
+            margin-bottom: 10px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            transition: background-color 0.3s ease;
+        }
+        .camera-position:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+        .camera-position h3 {
+            margin: 0 0 5px 0;
+            font-size: 16px;
+            color: #4CAF50;
+        }
+        .camera-position p {
+            margin: 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .camera-position.selected {
+            background-color: rgba(76, 175, 80, 0.3);
+            border-radius: 5px;
+            padding: 5px;
+        }
     </style>
 </head>
 <body>
-    <div id="info">Drag to rotate, Scroll to zoom in/out</div>
+    <div id="info">Drag to rotate, Scroll to zoom in/out, Click on camera to select</div>
+    <div id="camera-info">
+        <div id="camera1" class="camera-position">
+            <h3>Camera 1</h3>
+            <p>Loading...</p>
+        </div>
+        <div id="camera2" class="camera-position">
+            <h3>Camera 2</h3>
+            <p>Loading...</p>
+        </div>
+        <div id="camera3" class="camera-position">
+            <h3>Camera 3</h3>
+            <p>Loading...</p>
+        </div>
+    </div>
     <script>
+        // Set up Socket.IO connection
+        const socket = io();
+
         // Set up the scene, camera, and renderer
         const scene = new THREE.Scene();
         scene.background = new THREE.Color(0x333333);
@@ -47,14 +121,14 @@
         function createCameraRepresentation() {
             const geometry = new THREE.BufferGeometry();
             const vertices = new Float32Array([
-                0, 0, 0,    -1, -1, 2,
-                0, 0, 0,    1, -1, 2,
-                0, 0, 0,    1, 1, 2,
-                0, 0, 0,    -1, 1, 2,
-                -1, -1, 2,  1, -1, 2,
-                1, -1, 2,   1, 1, 2,
-                1, 1, 2,    -1, 1, 2,
-                -1, 1, 2,   -1, -1, 2
+                0, 0, 0,    -0.5, -0.5, 1,
+                0, 0, 0,    0.5, -0.5, 1,
+                0, 0, 0,    0.5, 0.5, 1,
+                0, 0, 0,    -0.5, 0.5, 1,
+                -0.5, -0.5, 1,  0.5, -0.5, 1,
+                0.5, -0.5, 1,   0.5, 0.5, 1,
+                0.5, 0.5, 1,    -0.5, 0.5, 1,
+                -0.5, 0.5, 1,   -0.5, -0.5, 1
             ]);
             geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
             const material = new THREE.LineBasicMaterial({ color: 0xffffff });
@@ -65,12 +139,14 @@
         const cameraReps = [];
         for (let i = 0; i < 3; i++) {
             const cameraRep = createCameraRepresentation();
-            cameraRep.scale.set(0.2, 0.2, 0.2); // Scale down the representation
+            cameraRep.scale.set(0.4, 0.4, 0.4);
+            cameraRep.userData.index = i;
             scene.add(cameraRep);
             cameraReps.push(cameraRep);
         }
 
-        // Function to update camera representation positions and orientations
+        let selectedCamera = null;
+
         function updateCameraRepresentations(positions, lookAts) {
             cameraReps.forEach((rep, index) => {
                 if (positions[index] && lookAts[index]) {
@@ -78,13 +154,23 @@
                     rep.lookAt(...lookAts[index]);
                 }
             });
+            updateCameraInfoDisplay(positions, lookAts);
         }
 
-        // Example usage: Update camera representations
-        updateCameraRepresentations(
-            [[2, 2, 2], [-2, 2, 2], [0, 2, -2]], // Positions
-            [[0, 0, 0], [0, 0, 0], [0, 0, 0]]    // Look-at points
-        );
+        function updateCameraInfoDisplay(positions, lookAts) {
+            for (let i = 0; i < 3; i++) {
+                const cameraElement = document.getElementById(`camera${i+1}`);
+                if (positions[i] && lookAts[i]) {
+                    const pos = positions[i];
+                    const lookAt = lookAts[i];
+                    cameraElement.innerHTML = `
+                        <h3>Camera ${i+1}</h3>
+                        <p>Pos: (${pos[0].toFixed(2)}, ${pos[1].toFixed(2)}, ${pos[2].toFixed(2)})</p>
+                        <p>Look: (${lookAt[0].toFixed(2)}, ${lookAt[1].toFixed(2)}, ${lookAt[2].toFixed(2)})</p>
+                    `;
+                }
+            }
+        }
 
         // Set initial camera position
         camera.position.set(5, 5, 5);
@@ -92,31 +178,82 @@
 
         // Variables for mouse control
         let isMouseDown = false;
+        let isDragging = false;
         let previousMousePosition = { x: 0, y: 0 };
         let spherical = new THREE.Spherical().setFromVector3(camera.position);
 
-        // Mouse event listeners (unchanged)
-        renderer.domElement.addEventListener('mousedown', (e) => { isMouseDown = true; });
-        renderer.domElement.addEventListener('mouseup', () => { isMouseDown = false; });
+        // Raycaster for selection
+        const raycaster = new THREE.Raycaster();
+        raycaster.params.Line.threshold = 0.05; // Adjust this value for selection precision
+        const mouse = new THREE.Vector2();
+
+        // Mouse event listeners
+        renderer.domElement.addEventListener('mousedown', (e) => { 
+            isMouseDown = true;
+            isDragging = false;
+        });
+        
         renderer.domElement.addEventListener('mousemove', (e) => {
             if (isMouseDown) {
+                isDragging = true;
                 const deltaMove = {
                     x: e.offsetX - previousMousePosition.x,
                     y: e.offsetY - previousMousePosition.y
                 };
                 spherical.theta -= deltaMove.x * 0.005;
                 spherical.phi -= deltaMove.y * 0.005;
-                spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
+                spherical.phi = Math.max(0.05, Math.min(Math.PI - 0.05, spherical.phi));
                 camera.position.setFromSpherical(spherical);
                 camera.lookAt(scene.position);
             }
             previousMousePosition = { x: e.offsetX, y: e.offsetY };
         });
+        
+        renderer.domElement.addEventListener('mouseup', (e) => { 
+            isMouseDown = false;
+            if (!isDragging) {
+                mouse.x = (e.clientX / window.innerWidth) * 2 - 1;
+                mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
+                raycaster.setFromCamera(mouse, camera);
+                const intersects = raycaster.intersectObjects(cameraReps);
+                if (intersects.length > 0) {
+                    selectCamera(intersects[0].object.userData.index);
+                } else {
+                    deselectCamera();
+                }
+            }
+            isDragging = false;
+        });
+        
         renderer.domElement.addEventListener('wheel', (e) => {
             e.preventDefault();
             spherical.radius += e.deltaY * 0.05;
             spherical.radius = Math.max(2, Math.min(100, spherical.radius));
             camera.position.setFromSpherical(spherical);
+        });
+
+        function selectCamera(index) {
+            if (selectedCamera !== null) {
+                cameraReps[selectedCamera].material.color.setHex(0xffffff); // Reset color to white
+                document.getElementById(`camera${selectedCamera+1}`).classList.remove('selected');
+            }
+            selectedCamera = index;
+            cameraReps[index].material.color.setHex(0x00ff00); // Change color to green
+            document.getElementById(`camera${index+1}`).classList.add('selected');
+        }
+
+        function deselectCamera() {
+            if (selectedCamera !== null) {
+                cameraReps[selectedCamera].material.color.setHex(0xffffff); // Reset color to white
+                document.getElementById(`camera${selectedCamera+1}`).classList.remove('selected');
+                selectedCamera = null;
+            }
+        }
+
+        // Socket.IO event listener for camera position updates
+        socket.on('camera_positions_update', function(data) {
+            console.log("Received camera positions update:", data);
+            updateCameraRepresentations(data.positions, data.lookAts);
         });
 
         // Animation loop

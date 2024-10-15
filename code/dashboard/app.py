@@ -2,8 +2,7 @@ from flask import Flask, Response, render_template
 from flask_socketio import SocketIO
 from camera_manager import CameraManager
 import time
-
-# TODO: Add div where to put 3d space of where can se the cameras initially then also th dots
+import threading
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 socketio = SocketIO(app)
@@ -12,6 +11,13 @@ print("1. Starting script")
 
 camera_manager = CameraManager()
 camera_manager.initialize_cameras()
+
+# Function to periodically send camera position updates
+def send_camera_updates():
+    while True:
+        camera_data = camera_manager.get_camera_data()
+        socketio.emit('camera_positions_update', camera_data)
+        socketio.sleep(0.1)  # Send updates every 100ms
 
 @app.route('/')
 def index():
@@ -55,9 +61,18 @@ def toggle_dot_detection(data):
     success = camera_manager.toggle_dot_detection(data['enable'])
     socketio.emit('dot_detection_toggle_response', {'success': success, 'enabled': data['enable']})
 
+@socketio.on('connect')
+def handle_connect():
+    print("Client connected")
+
 if __name__ == '__main__':
     try:
         print("4. Starting Flask app")
+        # Start the camera update thread
+        camera_update_thread = threading.Thread(target=send_camera_updates)
+        camera_update_thread.daemon = True
+        camera_update_thread.start()
+        
         socketio.run(app, debug=False, port=3001)
         print("5. Flask app has finished running")
     except Exception as e:

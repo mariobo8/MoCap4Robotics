@@ -1,6 +1,8 @@
 import cv2
 import numpy as np
 from pseyepy import Camera
+import time
+import math
 
 class CameraManager:
     def __init__(self):
@@ -11,6 +13,7 @@ class CameraManager:
         self.placeholder_frames = []
         self.resolutions = []
         self.detect_dots = False  # Flag to enable/disable dot detection
+        self.camera_positions = []  # To store camera positions
 
     def initialize_cameras(self):
         try:
@@ -20,6 +23,8 @@ class CameraManager:
             self.num_cameras = len(self.cameras.exposure)
             print(f"Number of cameras: {self.num_cameras}")
             self.resolutions = self.cameras.resolution
+            # Initialize camera positions
+            self.camera_positions = [[0, 0, 0] for _ in range(self.num_cameras)]
         except Exception as e:
             print(f"Error initializing cameras: {str(e)}")
             self.cameras = None
@@ -111,3 +116,27 @@ class CameraManager:
         if self.cameras:
             print("Closing cameras")
             self.cameras.end()
+
+    
+    def get_camera_positions(self):
+        # TODO: Replace this with actual camera position retrieval logic
+        # For now, we'll return the stored positions
+        return self.camera_positions
+
+    def update_camera_positions(self):
+        # This method simulates camera movement
+        # Replace this with actual position updates when available
+        for i in range(self.num_cameras):
+            angle = 0.5 + (2 * math.pi * i / self.num_cameras)
+            self.camera_positions[i] = [
+                2 * math.sin(angle),
+                2,
+                2 * math.cos(angle)
+            ]
+
+    def get_camera_data(self):
+        self.update_camera_positions()  # Update positions (simulated movement)
+        return {
+            'positions': self.get_camera_positions(),
+            'lookAts': [[0, 0, 0]] * self.num_cameras  # All cameras looking at origin
+        }
