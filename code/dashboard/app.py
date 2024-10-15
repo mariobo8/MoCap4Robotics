@@ -5,7 +5,7 @@ import time
 
 # TODO: Add div where to put 3d space of where can se the cameras initially then also th dots
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static', static_url_path='/static')
 socketio = SocketIO(app)
 
 print("1. Starting script")

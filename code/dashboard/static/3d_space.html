@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Three.js Scene with Camera Representations</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        body { margin: 0; }
+        canvas { display: block; }
+        #info { position: absolute; top: 10px; width: 100%; text-align: center; color: white; }
+    </style>
+</head>
+<body>
+    <div id="info">Drag to rotate, Scroll to zoom in/out</div>
+    <script>
+        // Set up the scene, camera, and renderer
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x333333);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        // Add a grid helper
+        const gridHelper = new THREE.GridHelper(10, 10, 0xffffff, 0x555555);
+        scene.add(gridHelper);
+
+        // Function to create a thick line for axis
+        function createThickLine(start, end, color) {
+            const points = [];
+            points.push(new THREE.Vector3(...start));
+            points.push(new THREE.Vector3(...end));
+            const geometry = new THREE.BufferGeometry().setFromPoints(points);
+            const material = new THREE.LineBasicMaterial({ color: color, linewidth: 3 });
+            return new THREE.Line(geometry, material);
+        }
+
+        // Create custom axes
+        const axesGroup = new THREE.Group();
+        axesGroup.add(createThickLine([0, 0, 0], [2, 0, 0], 0xff0000)); // X-axis (red)
+        axesGroup.add(createThickLine([0, 0, 0], [0, 2, 0], 0x00ff00)); // Y-axis (green)
+        axesGroup.add(createThickLine([0, 0, 0], [0, 0, 2], 0x0000ff)); // Z-axis (blue)
+        scene.add(axesGroup);
+
+        // Function to create a camera representation (wireframe pyramid)
+        function createCameraRepresentation() {
+            const geometry = new THREE.BufferGeometry();
+            const vertices = new Float32Array([
+                0, 0, 0,    -1, -1, 2,
+                0, 0, 0,    1, -1, 2,
+                0, 0, 0,    1, 1, 2,
+                0, 0, 0,    -1, 1, 2,
+                -1, -1, 2,  1, -1, 2,
+                1, -1, 2,   1, 1, 2,
+                1, 1, 2,    -1, 1, 2,
+                -1, 1, 2,   -1, -1, 2
+            ]);
+            geometry.setAttribute('position', new THREE.BufferAttribute(vertices, 3));
+            const material = new THREE.LineBasicMaterial({ color: 0xffffff });
+            return new THREE.LineSegments(geometry, material);
+        }
+
+        // Create and add camera representations
+        const cameraReps = [];
+        for (let i = 0; i < 3; i++) {
+            const cameraRep = createCameraRepresentation();
+            cameraRep.scale.set(0.2, 0.2, 0.2); // Scale down the representation
+            scene.add(cameraRep);
+            cameraReps.push(cameraRep);
+        }
+
+        // Function to update camera representation positions and orientations
+        function updateCameraRepresentations(positions, lookAts) {
+            cameraReps.forEach((rep, index) => {
+                if (positions[index] && lookAts[index]) {
+                    rep.position.set(...positions[index]);
+                    rep.lookAt(...lookAts[index]);
+                }
+            });
+        }
+
+        // Example usage: Update camera representations
+        updateCameraRepresentations(
+            [[2, 2, 2], [-2, 2, 2], [0, 2, -2]], // Positions
+            [[0, 0, 0], [0, 0, 0], [0, 0, 0]]    // Look-at points
+        );
+
+        // Set initial camera position
+        camera.position.set(5, 5, 5);
+        camera.lookAt(0, 0, 0);
+
+        // Variables for mouse control
+        let isMouseDown = false;
+        let previousMousePosition = { x: 0, y: 0 };
+        let spherical = new THREE.Spherical().setFromVector3(camera.position);
+
+        // Mouse event listeners (unchanged)
+        renderer.domElement.addEventListener('mousedown', (e) => { isMouseDown = true; });
+        renderer.domElement.addEventListener('mouseup', () => { isMouseDown = false; });
+        renderer.domElement.addEventListener('mousemove', (e) => {
+            if (isMouseDown) {
+                const deltaMove = {
+                    x: e.offsetX - previousMousePosition.x,
+                    y: e.offsetY - previousMousePosition.y
+                };
+                spherical.theta -= deltaMove.x * 0.005;
+                spherical.phi -= deltaMove.y * 0.005;
+                spherical.phi = Math.max(0.1, Math.min(Math.PI - 0.1, spherical.phi));
+                camera.position.setFromSpherical(spherical);
+                camera.lookAt(scene.position);
+            }
+            previousMousePosition = { x: e.offsetX, y: e.offsetY };
+        });
+        renderer.domElement.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            spherical.radius += e.deltaY * 0.05;
+            spherical.radius = Math.max(2, Math.min(100, spherical.radius));
+            camera.position.setFromSpherical(spherical);
+        });
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        // Handle window resizing
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+    </script>
+</body>
+</html>
