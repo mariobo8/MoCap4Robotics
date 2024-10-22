@@ -53,10 +53,10 @@ class CameraManager:
         dots = []
         for contour in contours:
             area = cv2.contourArea(contour)
-            if 10 < area < 1000:  # Adjust these values based on the expected dot size
+            if 0.4 < area < 1000:  # Adjust these values based on the expected dot size
                 perimeter = cv2.arcLength(contour, True)
                 circularity = 4 * np.pi * area / (perimeter * perimeter)
-                if circularity > 0.6:  # Adjust this threshold as needed
+                if circularity > 0.1:  # Adjust this threshold as needed
                     M = cv2.moments(contour)
                     if M["m00"] != 0:
                         cX = int(M["m10"] / M["m00"])
