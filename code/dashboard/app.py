@@ -1,8 +1,10 @@
-from flask import Flask, Response, render_template
+from flask import Flask, Response, render_template, jsonify, send_file
 from flask_socketio import SocketIO
 from camera_manager import CameraManager
 import time
 import threading
+import json
+import io
 
 app = Flask(__name__, static_folder='static', static_url_path='/static')
 socketio = SocketIO(app)
@@ -12,7 +14,6 @@ print("1. Starting script")
 camera_manager = CameraManager()
 camera_manager.initialize_cameras()
 
-# Function to periodically send camera position updates
 def send_camera_updates():
     while True:
         camera_data = camera_manager.get_camera_data()
@@ -23,6 +24,16 @@ def send_camera_updates():
 @app.route('/')
 def index():
     return render_template('index.html', num_cameras=camera_manager.num_cameras, error_message=camera_manager.error_message)
+
+@app.route('/config')
+def get_config():
+    """Return current camera configuration"""
+    config_data = {
+        'camera_positions': camera_manager.camera_positions,
+        'calibration_data': getattr(camera_manager, 'calibration_data', {})
+    }
+    print("Sending config data:", config_data)  # Debug print
+    return jsonify(config_data)
 
 @app.route('/placeholder_frame/<int:camera_id>')
 def placeholder_frame(camera_id):

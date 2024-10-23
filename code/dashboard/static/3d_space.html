@@ -167,10 +167,26 @@
             cameraReps.push(cameraRep);
         }
 
-        // Initial positions for cameras (spread them out)
-        cameraReps[0].position.set(2, 0, 0);
-        cameraReps[1].position.set(-1, 0, 1.73);
-        cameraReps[2].position.set(-1, 0, -1.73);
+        fetch('/config')
+            .then(response => response.json())
+            .then(config => {
+                console.log("Received initial config:", config);  // Debug print
+                if (config.camera_positions && config.camera_positions.length > 0) {
+                    console.log("Setting initial positions:", config.camera_positions);
+                    // Set initial positions without animation
+                    cameraReps.forEach((rep, index) => {
+                        const pos = config.camera_positions[index];
+                        rep.position.set(pos[0], pos[1], pos[2]);
+                        rep.lookAt(0, 0, 0);  // All cameras look at origin
+                    });
+                    
+                    // Update the info display
+                    updateCameraInfoDisplay(config.camera_positions, Array(3).fill([0, 0, 0]));
+                } else {
+                    console.log("No camera positions in config");
+                }
+            })
+            .catch(error => console.error('Error loading initial positions:', error));
 
         let selectedCamera = null;
 
