@@ -134,9 +134,89 @@ class CameraManager:
                 2 * math.cos(angle)
             ]
 
+    def calibrate_cameras(self):
+        """
+        Calibrate camera positions based on detected patterns/dots in the camera views.
+        Updates camera_positions after successful calibration.
+        Returns a tuple (success: bool, message: str, positions: list)
+        """
+        try:
+            if not self.streaming:
+                return False, "Cameras must be streaming to perform calibration", None
+                
+            print("Starting camera calibration...")
+            
+            # Store detected points from each camera
+            all_camera_points = []
+            
+            # 1. Collect frames and detect points from all cameras
+            for i in range(self.num_cameras):
+                if self.cameras:
+                    frame, _ = self.cameras.read(i)
+                    frame_bgr = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+                    
+                    # Use the existing dot detection method
+                    dots = self.detect_white_dots(frame_bgr)
+                    if not dots:
+                        return False, f"No calibration points detected in camera {i+1}", None
+                        
+                    all_camera_points.append(dots)
+                    print(f"Camera {i+1}: Detected {len(dots)} points")
+            
+            # 2. Calculate relative positions based on detected points
+            if len(all_camera_points) >= 2:  # Need at least 2 cameras
+                # Calculate centroid of points for each camera
+                camera_centroids = []
+                for dots in all_camera_points:
+                    if dots:
+                        centroid_x = sum(x for x, _ in dots) / len(dots)
+                        centroid_y = sum(y for _, y in dots) / len(dots)
+                        camera_centroids.append((centroid_x, centroid_y))
+                
+                # 3. Calculate relative 3D positions
+                new_positions = []
+                for i, centroid in enumerate(camera_centroids):
+                    # Normalize centroid coordinates to [-1, 1] range
+                    norm_x = (centroid[0] / self.resolutions[i][0] - 0.5) * 2
+                    norm_y = (centroid[1] / self.resolutions[i][1] - 0.5) * 2
+                    
+                    # Convert to 3D position (simplified example)
+                    angle = math.atan2(norm_x, 2)
+                    radius = 3.0
+                    height = norm_y * 2
+                    
+                    x = radius * math.sin(angle)
+                    y = height
+                    z = radius * math.cos(angle)
+                    
+                    new_positions.append([x, y, z])
+                
+                # 4. Update camera positions
+                self.camera_positions = new_positions
+                
+                # 5. Store calibration data
+                self.calibration_data = {
+                    'timestamp': time.time(),
+                    'camera_positions': new_positions,
+                    'detected_points': all_camera_points
+                }
+                
+                # Return the new positions along with success status
+                return True, "Calibration completed successfully", new_positions
+            else:
+                return False, "Insufficient cameras for calibration", None
+                
+        except Exception as e:
+            error_msg = f"Calibration failed: {str(e)}"
+            print(error_msg)
+            return False, error_msg, None
+
     def get_camera_data(self):
-        self.update_camera_positions()  # Update positions (simulated movement)
+        """
+        Returns the current camera positions and look-at points.
+        """
         return {
-            'positions': self.get_camera_positions(),
-            'lookAts': [[0, 0, 0]] * self.num_cameras  # All cameras looking at origin
+            'positions': self.camera_positions,
+            'lookAts': [[0, 0, 0]] * self.num_cameras,
+            'timestamp': time.time()  # Add timestamp for frontend to detect updates
         }

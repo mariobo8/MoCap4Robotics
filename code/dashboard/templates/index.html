@@ -179,6 +179,7 @@
                     <button onclick="updateSettings()">Update</button>
                     <button id="toggleStreamBtn" onclick="toggleStream()">Start Streaming</button>
                     <button id="toggleDotDetectionBtn" onclick="toggleDotDetection()">Start Detection</button>
+                    <button id="calibrateBtn" onclick="calibrateCameras()">Calibrate Cameras</button>
                 </div>
             </div>
             <div class="camera-container">
@@ -197,6 +198,9 @@
         <div class="visualization-3d">
             <div class="streams-header">
                 <h2>3D Visualization</h2>
+                <div class="controls">
+                    <button id="calibrateBtn" onclick="calibrateCameras()">Calibrate Cameras</button>
+                </div>
             </div>
             <iframe src="{{ url_for('static', filename='3d_space.html') }}" class="visualization-content"></iframe>
         </div>
@@ -271,6 +275,25 @@
             } else {
                 console.error('Failed to toggle stream:', data.action);
                 alert(`Failed to ${data.action} stream`);
+            }
+        });
+
+        function calibrateCameras() {
+        const calibrateBtn = document.getElementById('calibrateBtn');
+        calibrateBtn.disabled = true;
+        calibrateBtn.textContent = 'Calibrating...';
+        socket.emit('calibrate_cameras');
+        }
+
+        socket.on('calibration_response', function(data) {
+            const calibrateBtn = document.getElementById('calibrateBtn');
+            calibrateBtn.disabled = false;
+            calibrateBtn.textContent = 'Calibrate Cameras';
+            
+            if (data.success) {
+                alert('Calibration successful: ' + data.message);
+            } else {
+                alert('Calibration failed: ' + data.message);
             }
         });
     </script>

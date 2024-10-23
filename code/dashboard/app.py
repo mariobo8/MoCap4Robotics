@@ -16,8 +16,9 @@ camera_manager.initialize_cameras()
 def send_camera_updates():
     while True:
         camera_data = camera_manager.get_camera_data()
+        camera_data['isCalibration'] = False  # Regular update
         socketio.emit('camera_positions_update', camera_data)
-        socketio.sleep(0.1)  # Send updates every 100ms
+        socketio.sleep(0.1)
 
 @app.route('/')
 def index():
@@ -60,6 +61,30 @@ def toggle_camera_stream(data):
 def toggle_dot_detection(data):
     success = camera_manager.toggle_dot_detection(data['enable'])
     socketio.emit('dot_detection_toggle_response', {'success': success, 'enabled': data['enable']})
+
+@socketio.on('calibrate_cameras')
+def handle_calibration():
+    success, message, new_positions = camera_manager.calibrate_cameras()
+    
+    if success and new_positions:
+        # Send camera positions update with calibration flag
+        camera_data = camera_manager.get_camera_data()
+        camera_data['isCalibration'] = True  # Add flag to indicate this is a calibration update
+        socketio.emit('camera_positions_update', camera_data)
+        
+        # Send calibration response without alert
+        socketio.emit('calibration_response', {
+            'success': success,
+            'message': message,
+            'silent': True  # Flag to prevent alert
+        })
+    else:
+        # Send failure response with alert
+        socketio.emit('calibration_response', {
+            'success': success,
+            'message': message,
+            'silent': False
+        })
 
 @socketio.on('connect')
 def handle_connect():
