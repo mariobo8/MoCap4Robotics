@@ -23,14 +23,18 @@ def send_camera_updates():
 
 @app.route('/')
 def index():
-    return render_template('index.html', num_cameras=camera_manager.num_cameras, error_message=camera_manager.error_message)
+    return render_template('index.html', 
+                         num_cameras=camera_manager.num_cameras,
+                         error_message=camera_manager.error_message,
+                         using_mock=camera_manager.using_mock)
 
 @app.route('/config')
 def get_config():
     """Return current camera configuration"""
     config_data = {
         'camera_positions': camera_manager.camera_positions,
-        'calibration_data': getattr(camera_manager, 'calibration_data', {})
+        'calibration_data': getattr(camera_manager, 'calibration_data', {}),
+        'using_mock': camera_manager.using_mock  # Add mock status to config
     }
     print("Sending config data:", config_data)  # Debug print
     return jsonify(config_data)
@@ -104,6 +108,8 @@ def handle_connect():
 if __name__ == '__main__':
     try:
         print("4. Starting Flask app")
+        print(f"Using {'mock' if camera_manager.using_mock else 'real'} cameras")
+        
         # Start the camera update thread
         camera_update_thread = threading.Thread(target=send_camera_updates)
         camera_update_thread.daemon = True
