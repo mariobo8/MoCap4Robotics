@@ -18,43 +18,54 @@ class CameraManager:
         self.detect_dots = False
         self.camera_positions = []
         self.config_path = 'code/dashboard/config/camera_params.json'
+        self.using_mock = False  # Track if we're using mock cameras
         
         # Create config directory if it doesn't exist
         os.makedirs(os.path.dirname(self.config_path), exist_ok=True)
         # Load config first
-        self.load_camera_config()        
+        self.load_camera_config()
 
     def initialize_cameras(self):
         try:
-            print("Attempting to initialize cameras")
+            print("Attempting to initialize real PS3 Eye cameras...")
+            from pseyepy import Camera
             self.cameras = Camera([0, 1, 2], fps=30, resolution=Camera.RES_LARGE, colour=True)
-            print(f"Cameras initialized: fps={self.cameras.fps}, resolution={self.cameras.resolution}, colour={self.cameras.colour}")
-            self.num_cameras = len(self.cameras.exposure)
-            print(f"Number of cameras: {self.num_cameras}")
-            self.resolutions = self.cameras.resolution
+            print(f"Real cameras initialized: fps={self.cameras.fps}, resolution={self.cameras.resolution}, colour={self.cameras.colour}")
+            self.using_mock = False
             
-            # Only set default positions if none were loaded
-            if not self.camera_positions:
-                self.camera_positions = [[0, 0, 0] for _ in range(self.num_cameras)]
-                
         except Exception as e:
-            print(f"Error initializing cameras: {str(e)}")
-            self.cameras = None
+            print(f"Failed to initialize real cameras: {str(e)}")
+            print("Falling back to mock cameras...")
+            try:
+                from mock_camera import MockCamera
+                self.cameras = MockCamera([0, 1, 2], fps=[30, 30, 30], resolution="large", colour=True)
+                print("Mock cameras initialized successfully")
+                self.using_mock = True
+                self.error_message = "Using mock cameras - PS3 Eye cameras not detected"
+            except Exception as mock_e:
+                print(f"Failed to initialize mock cameras: {str(mock_e)}")
+                self.cameras = None
+                self.error_message = f"Failed to initialize both real and mock cameras: {str(e)}, {str(mock_e)}"
+                
+        finally:
+            # Set up common parameters regardless of camera type
             self.num_cameras = 3
-            self.error_message = str(e)
             self.resolutions = [(640, 480)] * self.num_cameras
             
             # Only set default positions if none were loaded
             if not self.camera_positions:
-                self.set_default_positions()
+                self.camera_positions = [[0, 0, 0] for _ in range(self.num_cameras)]
 
-        # Create placeholder frames
-        self.placeholder_frames = []
-        for i in range(self.num_cameras):
-            width, height = self.resolutions[i]
-            placeholder = np.zeros((height, width, 3), dtype=np.uint8)
-            cv2.putText(placeholder, f"Camera {i+1}", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-            self.placeholder_frames.append(placeholder)
+            # Create placeholder frames
+            self.placeholder_frames = []
+            for i in range(self.num_cameras):
+                width, height = self.resolutions[i]
+                placeholder = np.zeros((height, width, 3), dtype=np.uint8)
+                cv2.putText(placeholder, f"Camera {i+1}", (50, 50), 
+                           cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                self.placeholder_frames.append(placeholder)
+                
+        return self.cameras is not None
 
     def load_camera_config(self):
         """
