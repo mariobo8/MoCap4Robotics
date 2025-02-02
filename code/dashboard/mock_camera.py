@@ -7,13 +7,24 @@ from typing import List, Tuple, Optional
 @dataclass
 class DotPattern:
     positions: List[Tuple[int, int]]
-    
+
 class MockCamera:
-    def __init__(self, camera_ids: List[int], fps: List[int], resolution, colour: bool = True):
+    def __init__(self, camera_ids: List[int], fps: List[int], resolution, colour: bool = True, config: str = "cube"):
+        """
+        Initialize mock camera with specified configuration.
+        
+        Args:
+            camera_ids: List of camera IDs
+            fps: List of frame rates for each camera
+            resolution: Camera resolution ("large" or "small")
+            colour: Whether to generate color frames
+            config: Point configuration ("cube" or "plane")
+        """
         self.camera_ids = camera_ids
         self.num_cameras = len(camera_ids)
         self._fps = fps
         self._colour = colour
+        self.config = config
         
         # Set resolution
         if resolution == "large":
@@ -25,10 +36,21 @@ class MockCamera:
         self._exposure = [100] * self.num_cameras
         self._gain = [10] * self.num_cameras
         
-        # Initialize static dot patterns for each camera
-        self._patterns = []
-        
-        # Define base pattern (for middle camera)
+        # Initialize patterns based on selected configuration
+        self._patterns = self._get_patterns(config)
+
+    def _get_patterns(self, config: str) -> List[DotPattern]:
+        """Get dot patterns based on configuration."""
+        if config == "cube":
+            return self._get_cube_patterns()
+        elif config == "plane":
+            return self._get_plane_patterns()
+        else:
+            raise ValueError(f"Unknown configuration: {config}. Use 'cube' or 'plane'.")
+
+    def _get_cube_patterns(self) -> List[DotPattern]:
+        """Get patterns for cube configuration (current 8-point pattern)."""
+        # Base pattern (for middle camera)
         base_pattern = [
             (220, 140),   # Top front left
             (420, 140),   # Top front right
@@ -40,9 +62,8 @@ class MockCamera:
             (380, 300),   # Bottom back right
         ]
         
-        # Define patterns for each camera
         patterns = [
-            # Camera 1 (left rotated view) - moved inward to keep all dots visible
+            # Camera 1 (left rotated view)
             [
                 (180, 140),   # Top front left
                 (380, 140),   # Top front right
@@ -53,9 +74,9 @@ class MockCamera:
                 (200, 300),   # Bottom back left
                 (340, 300),   # Bottom back right
             ],
-            # Camera 2 (front view) - use base pattern
+            # Camera 2 (front view)
             base_pattern,
-            # Camera 3 (right rotated view) - moved inward to keep all dots visible
+            # Camera 3 (right rotated view)
             [
                 (260, 140),   # Top front left
                 (460, 140),   # Top front right
@@ -68,8 +89,50 @@ class MockCamera:
             ]
         ]
         
-        for pattern in patterns:
-            self._patterns.append(DotPattern(pattern))
+        return [DotPattern(p) for p in patterns]
+
+    def _get_plane_patterns(self) -> List[DotPattern]:
+        """Get patterns for plane configuration (8 points in a flat plane)."""
+        # Define a flat plane of points that will appear to rotate between cameras
+        base_points = [
+            (220, 120),   # Top left
+            (320, 120),   # Top middle
+            (420, 120),   # Top right
+            (220, 240),   # Middle left
+            (420, 240),   # Middle right
+            (220, 360),   # Bottom left
+            (320, 360),   # Bottom middle
+            (420, 360),   # Bottom right
+        ]
+
+        patterns = [
+            # Camera 1 (left rotated view - points compressed on right)
+            [
+                (160, 120),   # Top left
+                (240, 120),   # Top middle
+                (320, 120),   # Top right
+                (160, 240),   # Middle left
+                (320, 240),   # Middle right
+                (160, 360),   # Bottom left
+                (240, 360),   # Bottom middle
+                (320, 360),   # Bottom right
+            ],
+            # Camera 2 (front view - evenly spaced)
+            base_points,
+            # Camera 3 (right rotated view - points compressed on left)
+            [
+                (320, 120),   # Top left
+                (400, 120),   # Top middle
+                (480, 120),   # Top right
+                (320, 240),   # Middle left
+                (480, 240),   # Middle right
+                (320, 360),   # Bottom left
+                (400, 360),   # Bottom middle
+                (480, 360),   # Bottom right
+            ]
+        ]
+        
+        return [DotPattern(p) for p in patterns]
             
     def read(self, camera_index: Optional[int] = None) -> Tuple[np.ndarray, float]:
         """Generate a synthetic frame with static dots."""

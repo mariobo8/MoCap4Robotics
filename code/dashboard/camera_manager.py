@@ -25,7 +25,13 @@ class CameraManager:
         # Load config first
         self.load_camera_config()
 
-    def initialize_cameras(self):
+    def initialize_cameras(self, mock_config="plane"):
+        """
+        Initialize cameras with optional mock configuration.
+        
+        Args:
+            mock_config: Configuration for mock cameras ("cube" or "plane")
+        """
         try:
             print("Attempting to initialize real PS3 Eye cameras...")
             from pseyepy import Camera
@@ -35,13 +41,14 @@ class CameraManager:
             
         except Exception as e:
             print(f"Failed to initialize real cameras: {str(e)}")
-            print("Falling back to mock cameras...")
+            print(f"Falling back to mock cameras with {mock_config} configuration...")
             try:
                 from mock_camera import MockCamera
-                self.cameras = MockCamera([0, 1, 2], fps=[30, 30, 30], resolution="large", colour=True)
-                print("Mock cameras initialized successfully")
+                self.cameras = MockCamera([0, 1, 2], fps=[30, 30, 30], resolution="large", 
+                                       colour=True, config=mock_config)
+                print(f"Mock cameras initialized successfully with {mock_config} configuration")
                 self.using_mock = True
-                self.error_message = "Using mock cameras - PS3 Eye cameras not detected"
+                self.error_message = f"Using mock cameras ({mock_config} config) - PS3 Eye cameras not detected"
             except Exception as mock_e:
                 print(f"Failed to initialize mock cameras: {str(mock_e)}")
                 self.cameras = None
