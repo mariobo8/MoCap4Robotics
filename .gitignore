@@ -65,3 +65,6 @@ pkg/
 # Ignore C# specific files
 bin/
 obj/
+
+# sw temp files
+*~$
